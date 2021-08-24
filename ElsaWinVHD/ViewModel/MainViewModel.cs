@@ -1,4 +1,5 @@
 ﻿using ElsaWinVHD.Domain;
+using ElsaWinVHD.Enum;
 using ElsaWinVHD.Model;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -102,7 +103,7 @@ namespace ElsaWinVHD.ViewModel
                 InfoMain.Add("First start...");
                 Directory.CreateDirectory(ElsaWin_dirMount);
 
-                ElsaService(false);
+                ElsaService(ServiceStatus.Stop);
                 foreach(var tmp in dir)
                     FirstStartMoveDir(tmp);
             }
@@ -161,7 +162,14 @@ namespace ElsaWinVHD.ViewModel
             if(p is bool onOff)
             {
                 InfoCommand = "";
-                ElsaService(onOff);
+                if (onOff)
+                {
+                    ElsaService(ServiceStatus.Start);
+                }
+                else
+                {
+                    ElsaService(ServiceStatus.Stop);
+                }
             }
         }
 
@@ -184,13 +192,13 @@ namespace ElsaWinVHD.ViewModel
                 }
                 else
                 {
-                    ElsaService(false);
+                    ElsaService(ServiceStatus.Stop);
                     DiskPartVHD(null, false);
                     ElsaMklink(selectName, false);
                 }
             }
             else
-                ElsaService(false);
+                ElsaService(ServiceStatus.Stop);
 
             int check = 0;
             while (5 == 5)
@@ -218,7 +226,7 @@ namespace ElsaWinVHD.ViewModel
             }
             ElsaMklink(selectName, mount);
             ElsaSelect(selectName, mount);
-            ElsaService(true);
+            ElsaService(ServiceStatus.Start);
 
             if (mount)
             {
@@ -270,11 +278,11 @@ namespace ElsaWinVHD.ViewModel
             }
         }
 
-        private void ElsaService(bool _service)
+        private void ElsaService(ServiceStatus serviceStatus)
         {
             string[] WriteLine;
 
-            if (_service)
+            if (serviceStatus == ServiceStatus.Start)
             {
                 WriteLine = new string[]
                 {
