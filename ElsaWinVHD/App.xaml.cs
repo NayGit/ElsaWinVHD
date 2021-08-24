@@ -13,7 +13,7 @@ namespace ElsaWinVHD
         {
             base.OnStartup(e);
 
-#if !NET40
+#if !NET35
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 #endif
 

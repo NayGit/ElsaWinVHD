@@ -64,6 +64,7 @@ namespace ElsaWinVHD.ViewModel
             InfoMain = new ObservableCollection<string>();
 
             string pathKey;
+#if !NET35
             if (Environment.Is64BitOperatingSystem)
             {
                 Title += ": 64Bit";
@@ -74,6 +75,10 @@ namespace ElsaWinVHD.ViewModel
                 Title += ": 32Bit";
                 pathKey = @"SOFTWARE\Volkswagen AG\ElsaWin\";
             }
+#else
+            Title += ": Net35";
+            pathKey = @"SOFTWARE\Volkswagen AG\ElsaWin\";
+#endif
 
             RegistryKey ElsaWinDirKey = Registry.LocalMachine.OpenSubKey(pathKey + @"Directories");
             if (ElsaWinDirKey == null)
@@ -446,7 +451,7 @@ namespace ElsaWinVHD.ViewModel
                 File.WriteAllLines(ElsaWin_filePathVHD, tmpPath);
             }
         }
-        #endregion
+#endregion
 
         private void WindowClose()
         {
