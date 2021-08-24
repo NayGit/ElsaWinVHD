@@ -132,7 +132,7 @@ namespace ElsaWinVHD.ViewModel
 
             CommandCheckVHD_Single = new RelayCommand(p => CheckVHD_Single((int)p));
             
-            CommandStart = new RelayCommand(p => ELSA(ElsaWinAll[(int)p], true),
+            CommandStart = new RelayCommand(p => ELSA(ElsaWinAll[(int)p], MountStatus.Mount),
                                             p => p is int Id && File.Exists(ElsaWinAll[Id].Path));
 
             CommandClearAll = new RelayCommand(p => ClearAll());
@@ -154,7 +154,7 @@ namespace ElsaWinVHD.ViewModel
 
         private void ClearAll()
         {
-            ELSA(null, false);
+            ELSA(null, MountStatus.Unmount);
         }
 
         private void Service(object p)
@@ -173,12 +173,12 @@ namespace ElsaWinVHD.ViewModel
             }
         }
 
-        private void ELSA(ElsaWin elsaWin, bool mount)
+        private void ELSA(ElsaWin elsaWin, MountStatus mountStatus)
         {
             InfoCommand = "";
             string selectName = elsaWin is null ? "" : elsaWin.SelectName;
 
-            if (mount && File.Exists(ElsaWin_fileSelect))
+            if (mountStatus == MountStatus.Mount && File.Exists(ElsaWin_fileSelect))
             {
                 if (selectName == File.ReadAllText(ElsaWin_fileSelect))
                 {
@@ -193,8 +193,8 @@ namespace ElsaWinVHD.ViewModel
                 else
                 {
                     ElsaService(ServiceStatus.Stop);
-                    DiskPartVHD(null, false);
-                    ElsaMklink(selectName, false);
+                    DiskPartVHD(null, MountStatus.Unmount);
+                    ElsaMklink(selectName, MountStatus.Unmount);
                 }
             }
             else
@@ -203,8 +203,8 @@ namespace ElsaWinVHD.ViewModel
             int check = 0;
             while (5 == 5)
             {
-                DiskPartVHD(elsaWin, mount);
-                if (mount == false || File.Exists($@"{ElsaWin_dirMount}{selectName}\{selectName}"))
+                DiskPartVHD(elsaWin, mountStatus);
+                if (mountStatus == MountStatus.Unmount || File.Exists($@"{ElsaWin_dirMount}{selectName}\{selectName}"))
                 {
                     break;
                 }
@@ -220,15 +220,15 @@ namespace ElsaWinVHD.ViewModel
                         MessageBox.Show("diskpart.exe - Reboot??? Check: *.vhd???", "Error!!!", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
-                    InfoMain.Add($"{check}) DiskPart - {selectName} - {mount}");
+                    InfoMain.Add($"{check}) DiskPart - {selectName} - {mountStatus}");
                 }
                 check++;
             }
-            ElsaMklink(selectName, mount);
-            ElsaSelect(selectName, mount);
+            ElsaMklink(selectName, mountStatus);
+            ElsaSelect(selectName, mountStatus);
             ElsaService(ServiceStatus.Start);
 
-            if (mount)
+            if (mountStatus == MountStatus.Mount)
             {
                 Process.Start($@"{ElsaWin_Dir}\bin\ElsaWin.exe");
                 WindowClose();
@@ -242,11 +242,11 @@ namespace ElsaWinVHD.ViewModel
             }
         }
 
-        private void DiskPartVHD(ElsaWin elsaWin, bool _mount)
+        private void DiskPartVHD(ElsaWin elsaWin, MountStatus mountStatus)
         {
             string[] WriteLine;
 
-            if (_mount)
+            if (mountStatus == MountStatus.Mount)
             {
                 if (!Directory.Exists($"{ElsaWin_dirMount}{elsaWin.SelectName}"))
                 {
@@ -312,11 +312,11 @@ namespace ElsaWinVHD.ViewModel
             Thread.Sleep(2500);
         }
 
-        private void ElsaMklink(string selectName, bool _mklink)
+        private void ElsaMklink(string selectName, MountStatus mountStatus)
         {
             string[] WriteLine = new string[dir.Length];
 
-            if (_mklink)
+            if (mountStatus == MountStatus.Mount)
             {
                 for (int i = 0; i < dir.Length; i++)
                     WriteLine[i] = $@"mklink / j ""{ElsaWin_Dir}\{dir[i]}"" ""{ElsaWin_dirMount}{selectName}\{dir[i]}\""";
@@ -330,9 +330,9 @@ namespace ElsaWinVHD.ViewModel
             AllProcess("cmd.exe", WriteLine);
         }
 
-        private void ElsaSelect(string selectName, bool _select)
+        private void ElsaSelect(string selectName, MountStatus mountStatus)
         {
-            if (_select)
+            if (mountStatus == MountStatus.Mount)
             {
                 File.WriteAllText(ElsaWin_fileSelect, selectName);
             }
