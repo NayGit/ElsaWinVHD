@@ -6,6 +6,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -355,13 +356,16 @@ namespace ElsaWinVHD.ViewModel
                 {
                     p.StandardInput.WriteLine(__WriteLine);
                 }
-
                 p.StandardInput.WriteLine("exit");
-                string pOutput = p.StandardOutput.ReadToEnd();
-                Encoding pOutEncoding = p.StandardOutput.CurrentEncoding;
+
                 p.WaitForExit();
 
-                InfoCommand += EncToUTF8(pOutput, pOutEncoding);
+#if !NET35
+                using var reader = new StreamReader(p.StandardOutput.BaseStream, Encoding.GetEncoding(CultureInfo.CurrentUICulture.TextInfo.OEMCodePage));
+                InfoCommand += reader.ReadToEnd();
+#else
+                InfoCommand += EncToUTF8(p.StandardOutput.ReadToEnd(), p.StandardOutput.CurrentEncoding);
+#endif
             }
             catch (Win32Exception e)
             {
