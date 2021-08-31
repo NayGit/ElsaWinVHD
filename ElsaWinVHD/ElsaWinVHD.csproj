@@ -8,13 +8,6 @@
     <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="Resources\ImgAudi.png" />
-    <None Remove="Resources\ImgSeat.png" />
-    <None Remove="Resources\ImgSkoda.png" />
-    <None Remove="Resources\ImgVW.png" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net35'">
     <PackageReference Include="AsyncBridge" Version="0.3.1" />
     <PackageReference Include="WindowsAPICodePack-Shell" Version="1.1.1" />

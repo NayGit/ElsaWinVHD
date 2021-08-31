@@ -1,0 +1,170 @@
+name: Publish
+
+# Create Release
+#  https://github.com/actions/create-release/issues/14#issuecomment-653974075
+
+#on: [push, pull_request]
+
+#on:
+#  push:
+  #  branches: [ master ]
+  #pull_request:
+  #  branches: [ master ]
+  
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NAME_PROJECT: ElsaWinVHD
+  CONFIGURATION: Release
+  DOTNET_SDK_VERSION: 6.0.x
+  DOTNET_SDK_PRERELEASE: true
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        net: [net6.0-windows]
+        runtime: [ win-x86, win-x64]
+        full: ['', 'Full']
+        include:
+          - net: net35
+            runtime: win-x86
+            full: ''
+    
+    env:
+      NET: ${{ matrix.net }}
+      RUNTIME: ${{ matrix.runtime }}
+      FULL: ${{ matrix.full }}
+        
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: ${{ env.DOTNET_SDK_VERSION }}
+        include-prerelease: ${{ env.DOTNET_SDK_PRERELEASE }}
+    
+    - name: Publish
+      if: ${{ env.FULL == '' }}
+      run: dotnet publish -c "${{ env.CONFIGURATION }}" -f "${{ env.NET }}" -r "${{ env.RUNTIME }}" -o "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}" --no-self-contained
+      
+    - name: Publish Full
+      if: ${{ env.FULL == 'Full' }}
+      run: dotnet publish -c "${{ env.CONFIGURATION }}" -f "${{ env.NET }}" -r "${{ env.RUNTIME }}" -o "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}" --self-contained  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+    
+    - name: Upload
+      if: ${{ env.FULL == '' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: ${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}
+        path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}"
+        
+    - name: Upload Full
+      if: ${{ env.FULL == 'Full' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: ${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}
+        path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}"
+
+  create_release:
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+    needs: publish
+    runs-on: windows-latest
+    
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: "${{ env.NAME_PROJECT }} ${{ github.ref }}"
+        body_path: .github/RELEASE_TEMPLATE.md
+        prerelease: true
+
+  release:
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+    needs: [publish, create_release]
+    runs-on: windows-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        net: [net6.0-windows]
+        runtime: [ win-x86, win-x64]
+        full: ['', 'Full']
+        include:
+          - net: net35
+            runtime: win-x86
+            full: ''
+    
+    env:
+      NET: ${{ matrix.net }}
+      RUNTIME: ${{ matrix.runtime }}
+      FULL: ${{ matrix.full }}
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    
+    - name: Download
+      if: ${{ env.FULL == '' }}
+      uses: actions/download-artifact@v2.0.10
+      with:
+        name: ${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}
+        path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}" 
+        
+    - name: Download Full
+      if: ${{ env.FULL == 'Full' }}
+      uses: actions/download-artifact@v2.0.10
+      with:
+        name: ${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}
+        path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}"     
+    
+    
+    - name: Zip
+      if: ${{ env.FULL == '' }}
+      run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip" -CompressionLevel Optimal
+      
+    - name: Zip
+      if: ${{ env.FULL == 'Full' }}
+      run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}/${{ env.NAME_PROJECT }}.exe" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}.zip" -CompressionLevel Optimal
+    
+    - name: Upload
+      if: ${{ env.FULL == '' }}
+      uses: actions/upload-release-asset@v1.0.2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip"
+        asset_name: "${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip"
+        asset_content_type: application/zip
+
+    - name: Upload
+      if: ${{ env.FULL == 'Full' }}
+      uses: actions/upload-release-asset@v1.0.2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}.zip"
+        asset_name: "${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL }}.zip"
+        asset_content_type: application/zip
+        
+        #asset_content_type: application/octet-stream  #.exe
