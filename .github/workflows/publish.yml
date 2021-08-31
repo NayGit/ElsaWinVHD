@@ -1,9 +1,9 @@
-name: Publish
+name: Publish Matrix
 
 # Create Release
 #  https://github.com/actions/create-release/issues/14#issuecomment-653974075
 
-#on: [push, pull_request]
+on: [push, pull_request]
 
 #on:
 #  push:
@@ -11,10 +11,10 @@ name: Publish
   #pull_request:
   #  branches: [ master ]
   
-on:
-  push:
-    tags:
-      - 'v*'
+#on:
+#  push:
+#    tags:
+#      - 'v*'
 
 env:
   NAME_PROJECT: ElsaWinVHD
@@ -78,7 +78,7 @@ jobs:
   create_release:
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
     needs: publish
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -100,7 +100,7 @@ jobs:
   release:
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
     needs: [publish, create_release]
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     strategy:
       fail-fast: false
@@ -139,12 +139,14 @@ jobs:
     
     - name: Zip
       if: ${{ env.FULL == '' }}
-      run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip" -CompressionLevel Optimal
-      
+      #run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip" -CompressionLevel Optimal
+      run: zip -r "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}.zip" "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}"
+
     - name: Zip
       if: ${{ env.FULL == 'Full' }}
-      run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}/${{ env.NAME_PROJECT }}.exe" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}.zip" -CompressionLevel Optimal
-    
+      #run: Compress-Archive -Path "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}/${{ env.NAME_PROJECT }}.exe" -DestinationPath "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}.zip" -CompressionLevel Optimal
+      run: zip -r "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}.zip" "out/${{ env.NAME_PROJECT }}_${{ env.NET }}_${{ env.RUNTIME }}_${{ env.FULL}}/${{ env.NAME_PROJECT }}.exe"
+
     - name: Upload
       if: ${{ env.FULL == '' }}
       uses: actions/upload-release-asset@v1.0.2
