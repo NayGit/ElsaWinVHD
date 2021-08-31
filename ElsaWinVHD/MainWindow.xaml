@@ -69,6 +69,9 @@
             </MenuItem>
 
         </Menu>
+
+        <ProgressBar DockPanel.Dock="Top" MinHeight="7" IsIndeterminate="{Binding IsRun}" />
+
         <ItemsControl DockPanel.Dock="Left"
                       ItemsSource="{Binding ElsaWinAll}" >
             <ItemsControl.ItemsPanel>

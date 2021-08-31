@@ -1,6 +1,9 @@
 ﻿using ElsaWinVHD.ViewModel;
-using System.Text;
 using System.Windows;
+
+#if !NET35
+using System.Text;
+#endif
 
 namespace ElsaWinVHD
 {
