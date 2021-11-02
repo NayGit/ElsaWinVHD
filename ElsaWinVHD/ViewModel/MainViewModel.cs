@@ -4,18 +4,15 @@ using ElsaWinVHD.Model;
 using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using ElsaWinVHD.Domain;
 
 #if !NET35
 using Ookii.Dialogs.Wpf;
-using System.Globalization;
 #else
 using Microsoft.WindowsAPICodePack.Dialogs;
 #endif
@@ -24,8 +21,10 @@ namespace ElsaWinVHD.ViewModel
 {
     public class MainViewModel : ViewModelBase
     {
+        private readonly INet35Win7 net35Win7;
+
         private readonly string ElsaWin_Dir;
-        private readonly string ElsaWin_dirMount;
+        private readonly string ElsaWin_DirMount;
 
         private readonly string ElsaWin_fileSelect;
         private readonly string ElsaWin_filePathVHD;
@@ -52,7 +51,7 @@ namespace ElsaWinVHD.ViewModel
         public bool IsRun
         {
             get => isRun;
-            private set => SetProperty(ref isRun, value); 
+            private set => SetProperty(ref isRun, value);
         }
 
 
@@ -98,17 +97,25 @@ namespace ElsaWinVHD.ViewModel
                 return;
             }
 
+
+
             ElsaWin_Dir = (string)ElsaWinDirKey.GetValue("ProductDir");
             ElsaWinDirKey.Close();
             InfoMain.Add(ElsaWin_Dir);
 
-            ElsaWin_dirMount = ElsaWin_Dir + @"\!ElsaWinVHD\";
-            InfoMain.Add(ElsaWin_dirMount);
+            ElsaWin_DirMount = ElsaWin_Dir + @"\!ElsaWinVHD\";
+            InfoMain.Add(ElsaWin_DirMount);
 
-            if (!Directory.Exists(ElsaWin_dirMount))
+#if !NET35
+            net35Win7 = new Win7(ElsaWin_Dir, ElsaWin_DirMount);
+#else
+            net35Win7 = new Net35(ElsaWin_Dir, ElsaWin_DirMount);
+#endif
+
+            if (!Directory.Exists(ElsaWin_DirMount))
             {
                 InfoMain.Add("First start...");
-                Directory.CreateDirectory(ElsaWin_dirMount);
+                Directory.CreateDirectory(ElsaWin_DirMount);
 
                 ElsaService(ServiceStatus.Stop).GetAwaiter().GetResult();
                 foreach(var dir in dir)
@@ -152,7 +159,7 @@ namespace ElsaWinVHD.ViewModel
         public ICommand CommandCheckVHD_Multi { get; }
         public ICommand CommandCheckVHD_Single { get; }
 
-        #region Start Command
+#region Start Command
         private ICommand _CommandStart;
         public ICommand CommandStart => _CommandStart ?? (_CommandStart =
                     new RelayCommandAsync<int>(StartAsync, p => CanStart(p)));
@@ -174,9 +181,9 @@ namespace ElsaWinVHD.ViewModel
         {
             return !IsRun && File.Exists(ElsaWinAll[p].Path);
         }
-        #endregion
+#endregion
 
-        #region Service Command
+#region Service Command
         private ICommand _CommandService;
         public ICommand CommandService => _CommandService ?? (_CommandService =
                     new RelayCommandAsync<object>(ServiceAsync, p => !IsRun));
@@ -205,9 +212,9 @@ namespace ElsaWinVHD.ViewModel
                 IsRun = false;
             }
         }
-        #endregion
+#endregion
 
-        #region ClearAll Command
+#region ClearAll Command
         private ICommand _CommandClearAll;
         public ICommand CommandClearAll => _CommandClearAll ?? (_CommandClearAll =
                     new RelayCommandAsync(ClearAllAsync, p => !IsRun));
@@ -224,7 +231,7 @@ namespace ElsaWinVHD.ViewModel
                 IsRun = false;
             }
         }
-        #endregion
+#endregion
 
         private async Task ELSA(ElsaWin elsaWin, MountStatus mountStatus)
         {
@@ -235,7 +242,7 @@ namespace ElsaWinVHD.ViewModel
             {
                 if (selectName == File.ReadAllText(ElsaWin_fileSelect))
                 {
-                    if (File.Exists($@"{ElsaWin_dirMount}{selectName}\{selectName}"))
+                    if (File.Exists($@"{ElsaWin_DirMount}{selectName}\{selectName}"))
                     {
                         InfoCommand = $"Start: {selectName}";
                         Process.Start($@"{ElsaWin_Dir}\bin\ElsaWin.exe");
@@ -257,11 +264,11 @@ namespace ElsaWinVHD.ViewModel
             while (5 == 5)
             {
                 await DiskPartVHD(elsaWin, mountStatus);
-                if (mountStatus == MountStatus.Unmount || File.Exists($@"{ElsaWin_dirMount}{selectName}\{selectName}"))
+                if (mountStatus == MountStatus.Unmount || File.Exists($@"{ElsaWin_DirMount}{selectName}\{selectName}"))
                 {
                     break;
                 }
-                else if (Directory.Exists($@"{ElsaWin_dirMount}{selectName}\{dir[0]}"))
+                else if (Directory.Exists($@"{ElsaWin_DirMount}{selectName}\{dir[0]}"))
                 {
                     MessageBox.Show("diskpart.exe - Connect. Check: *.vhd???", "Error!!!", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -297,23 +304,14 @@ namespace ElsaWinVHD.ViewModel
 
         private async Task DiskPartVHD(ElsaWin elsaWin, MountStatus mountStatus)
         {
-            string[] WriteLine;
-
             if (mountStatus == MountStatus.Mount)
             {
-                if (!Directory.Exists($"{ElsaWin_dirMount}{elsaWin.SelectName}"))
+                if (!Directory.Exists($"{ElsaWin_DirMount}{elsaWin.SelectName}"))
                 {
-                    Directory.CreateDirectory($"{ElsaWin_dirMount}{elsaWin.SelectName}");
+                    Directory.CreateDirectory($"{ElsaWin_DirMount}{elsaWin.SelectName}");
                 }
 
-                WriteLine = new string[]
-                {
-                    $"SELECT VDISK FILE='{elsaWin.Path}'",
-                    "attach vdisk",
-                    "select part 1",
-                    $@"assign mount='{ElsaWin_dirMount}{elsaWin.SelectName}\'"
-                };
-                await AllProcess("diskpart.exe", WriteLine);
+                InfoCommand += await net35Win7.DiskPartAttach(elsaWin.Path, elsaWin.SelectName);
             }
             else
             {
@@ -322,65 +320,33 @@ namespace ElsaWinVHD.ViewModel
                     if (string.IsNullOrEmpty(el.Path))
                         continue;
 
-                    string tmpSingle = $"SELECT VDISK FILE='{el.Path}',";
-                    tmpSingle += "select part 1,";
-                    tmpSingle += $@"remove mount='{ElsaWin_dirMount}{el.SelectName}\',";    ///?????????? \',
-                    tmpSingle += "DETACH VDISK";
-                    await AllProcess("diskpart.exe", tmpSingle.Split(','));
+                    InfoCommand += await net35Win7.DiskPartDetach(el.Path, el.SelectName);
                 }
             }
         }
 
         private async Task ElsaService(ServiceStatus serviceStatus)
         {
-            string[] WriteLine;
-
             if (serviceStatus == ServiceStatus.Start)
             {
-                WriteLine = new string[]
-                {
-                    "(call sc start LcSvrAuf",
-                    "call sc start LcSvrAdm",
-                    "call sc start LcSvrHis",
-                    "call sc start LcSvrDba",
-                    "call sc start LcSvrPas",
-                    "call sc start LcSvrSaz)"
-                };
+                InfoCommand += await net35Win7.ServiceStart();
             }
             else
             {
-                WriteLine = new string[]
-                {
-                    "(call sc stop LcSvrAuf",
-                    "call sc stop LcSvrAdm",
-                    "call sc stop LcSvrHis",
-                    "call sc stop LcSvrDba",
-                    "call sc stop LcSvrPas",
-                    "call sc stop LcSvrSaz)"
-                };
+                InfoCommand += await net35Win7.ServiceStop();
             }
-
-            await AllProcess("cmd.exe", WriteLine);
-
-            await Task.Factory.StartNew(() => Thread.Sleep(2500));
         }
 
         private async Task ElsaMklink(string selectName, MountStatus mountStatus)
         {
-            string[] WriteLine = new string[dir.Length];
-
             if (mountStatus == MountStatus.Mount)
             {
-                for (int i = 0; i < dir.Length; i++)
-                    WriteLine[i] = $@"mklink / j ""{ElsaWin_Dir}\{dir[i]}"" ""{ElsaWin_dirMount}{selectName}\{dir[i]}\""";
+                InfoCommand += await net35Win7.MkLinkCreate(dir, selectName);
             }
             else
             {
-                for (int i = 0; i < dir.Length; i++)
-                    WriteLine[i] = $@"RD ""{ElsaWin_Dir}\{dir[i]}""";
+                InfoCommand += await net35Win7.MkLinkDelete(dir);
             }
-
-            await AllProcess("cmd.exe", WriteLine);
         }
 
         private void ElsaSelect(string selectName, MountStatus mountStatus)
@@ -395,68 +361,9 @@ namespace ElsaWinVHD.ViewModel
             }
         }
 
-        private async Task AllProcess(string _Filename, string[] _WriteLine)
-        {
-            try
-            {
-                Process p = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = _Filename,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardInput = true,
-                        WorkingDirectory = ElsaWin_Dir
-                    }
-                };
-                p.Start();
+        
 
-                foreach (string __WriteLine in _WriteLine)
-                {
-                    p.StandardInput.WriteLine(__WriteLine);
-                }
-                p.StandardInput.WriteLine("exit");
-                
-#if !NET35
-                await p.WaitForExitAsync();
-                using var reader = new StreamReader(p.StandardOutput.BaseStream, Encoding.GetEncoding(CultureInfo.CurrentUICulture.TextInfo.OEMCodePage));
-                InfoCommand += reader.ReadToEnd();
-#else
-                var tcs = new TaskCompletionSource<object>();
-                p.EnableRaisingEvents = true;
-                p.Exited += (s, e) => tcs.TrySetResult(null);
-                await tcs.Task;
-
-                InfoCommand += EncToUTF8(p.StandardOutput.ReadToEnd(), p.StandardOutput.CurrentEncoding);
-#endif
-            }
-            catch (Win32Exception e)
-            {
-                MessageBox.Show(e.Message, "Administrator???", MessageBoxButton.OK, MessageBoxImage.Error);
-                WindowClose();
-            }
-        }
-
-        private static string EncToUTF8(string source, Encoding encoding)
-        {
-            try
-            {
-                if (encoding.CodePage == Encoding.GetEncoding(1251).CodePage)
-                {
-                    byte[] bStr = encoding.GetBytes(source);
-                    return Encoding.GetEncoding(866).GetString(bStr);
-                }
-            }
-            catch (NotSupportedException)
-            {
-            }
-            
-            return source;
-        }
-
-        #region CheckVHD
+#region CheckVHD
         private void CheckVHD_Multi()
         {
             InfoCommand = "";
@@ -534,7 +441,7 @@ namespace ElsaWinVHD.ViewModel
                 File.WriteAllLines(ElsaWin_filePathVHD, tmpPath);
             }
         }
-        #endregion
+#endregion
 
         private void WindowClose()
         {
