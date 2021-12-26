@@ -20,7 +20,7 @@ env:
   NAME_PROJECT: ElsaWinVHD
   CONFIGURATION: Release
   DOTNET_SDK_VERSION: 6.0.x
-  DOTNET_SDK_PRERELEASE: true
+  DOTNET_SDK_PRERELEASE: false
 
 jobs:
   publish:
